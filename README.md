@@ -2,6 +2,10 @@
 
 A FastAPI-based proxy server that bridges OpenAI-compatible API calls to Ollama, allowing you to use OpenAI client libraries with locally-hosted Ollama models.
 
+Try to play with your local LLMs with a typical config of Cline, even Cline's prompts are too complex for most local LLMs:
+<img width="547" alt="oai_ollama_cline" src="https://github.com/user-attachments/assets/aacd076f-82a7-496b-83ae-eb820e52eff7" />
+
+
 ## Features
 
 - 🔄 **OpenAI API Compatibility**: Drop-in replacement for OpenAI's chat completions API
