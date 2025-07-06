@@ -16,7 +16,7 @@ async def test_request_formats():
         {
             "name": "Basic valid request",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [
                     {"role": "user", "content": "Hello"}
                 ]
@@ -25,7 +25,7 @@ async def test_request_formats():
         {
             "name": "Request with extra fields",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [
                     {"role": "user", "content": "Hello"}
                 ],
@@ -37,7 +37,7 @@ async def test_request_formats():
         {
             "name": "Request with system message",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [
                     {"role": "system", "content": "You are helpful"},
                     {"role": "user", "content": "Hello"}
@@ -47,7 +47,7 @@ async def test_request_formats():
         {
             "name": "Empty messages (should fail)",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": []
             }
         },
@@ -62,7 +62,7 @@ async def test_request_formats():
         {
             "name": "Invalid message role (might fail)",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [
                     {"role": "invalid_role", "content": "Hello"}
                 ]
@@ -71,7 +71,7 @@ async def test_request_formats():
         {
             "name": "Missing content in message (should fail)",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [
                     {"role": "user"}
                 ]
@@ -120,7 +120,7 @@ async def test_your_exact_request():
         {
             "name": "Request with null values",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": [{"role": "user", "content": "Hello"}],
                 "max_tokens": None,
                 "temperature": None
@@ -129,7 +129,7 @@ async def test_your_exact_request():
         {
             "name": "Request with string numbers",
             "data": {
-                "model": "llama2", 
+                "model": "gemma3:12b", 
                 "messages": [{"role": "user", "content": "Hello"}],
                 "max_tokens": "100",  # Should be int
                 "temperature": "0.7"  # Should be float
@@ -138,7 +138,7 @@ async def test_your_exact_request():
         {
             "name": "Request with wrong message structure",
             "data": {
-                "model": "llama2",
+                "model": "gemma3:12b",
                 "messages": "Hello"  # Should be array
             }
         }

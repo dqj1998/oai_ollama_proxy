@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Dict, Any, AsyncGenerator
+from typing import List, Optional, Dict, Any, AsyncGenerator, Union
 import httpx
 import json
 import time
@@ -51,30 +51,8 @@ async def log_requests(request: Request, call_next):
     logger.info(f"   User-Agent: {request.headers.get('user-agent', 'Unknown')}")
     logger.info(f"   Content-Type: {request.headers.get('content-type', 'None')}")
     
-    # Log request body for POST requests
     if request.method == "POST":
-        try:
-            # Read the body
-            body = await request.body()
-            if body:
-                try:
-                    # Try to parse as JSON for pretty printing
-                    json_body = json.loads(body)
-                    logger.info(f"   Request Body: {json.dumps(json_body, indent=2)}")
-                except json.JSONDecodeError:
-                    # If not JSON, log as string
-                    logger.info(f"   Request Body (raw): {body.decode('utf-8')[:500]}...")
-            else:
-                logger.info("   Request Body: Empty")
-                
-            # Important: Re-create the request with the body since we consumed it
-            def receive():
-                return {"type": "http.request", "body": body}
-            
-            request._receive = receive
-            
-        except Exception as e:
-            logger.error(f"   Error reading request body: {e}")
+        logger.info("   Request Body: (not logged in middleware to support streaming)")
     
     # Process the request
     response = await call_next(request)
@@ -127,9 +105,13 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama2")
 
 # OpenAI compatible models
+class ContentPart(BaseModel):
+    type: str
+    text: Optional[str] = None
+
 class Message(BaseModel):
     role: str  # "system", "user", "assistant"
-    content: str
+    content: Union[str, List[ContentPart]]
 
 class ChatCompletionRequest(BaseModel):
     model: str
@@ -180,17 +162,27 @@ class ModelsResponse(BaseModel):
     object: str = "list"
     data: List[Model]
 
+def get_content_text(content: Union[str, List[ContentPart]]) -> str:
+    """Extract text from content, whether it's a string or a list of content parts"""
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        return "\n".join(part.text for part in content if part.type == "text" and part.text)
+    else:
+        raise ValueError("Invalid content type")
+
 def convert_openai_to_ollama(request: ChatCompletionRequest) -> Dict[str, Any]:
     """Convert OpenAI chat completion request to Ollama format"""
     # Build the prompt from messages
     prompt = ""
     for message in request.messages:
+        content_text = get_content_text(message.content)
         if message.role == "system":
-            prompt += f"System: {message.content}\n"
+            prompt += f"System: {content_text}\n"
         elif message.role == "user":
-            prompt += f"User: {message.content}\n"
+            prompt += f"User: {content_text}\n"
         elif message.role == "assistant":
-            prompt += f"Assistant: {message.content}\n"
+            prompt += f"Assistant: {content_text}\n"
     
     prompt += "Assistant: "
     
@@ -251,7 +243,8 @@ async def list_models():
     """List available models from Ollama"""
     logger.info("📋 Listing available models from Ollama...")
     try:
-        async with httpx.AsyncClient() as client:
+        timeout_value = int(os.getenv('TIMEOUT', 300))
+        async with httpx.AsyncClient(timeout=timeout_value) as client:
             response = await client.get(f"{OLLAMA_BASE_URL}/api/tags")
             logger.info(f"📥 Ollama models response status: {response.status_code}")
             
@@ -284,7 +277,9 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
     logger.info(f"   Model: {request.model}")
     logger.info(f"   Messages: {len(request.messages)} message(s)")
     for i, msg in enumerate(request.messages):
-        logger.info(f"     [{i}] {msg.role}: {msg.content[:100]}{'...' if len(msg.content) > 100 else ''}")
+        content_text = get_content_text(msg.content)
+        logger.debug(f"     Message {i}: Role - {msg.role}, Content - {msg.content}")
+        logger.info(f"     [{i}] {msg.role}: {content_text[:100]}{'...' if len(content_text) > 100 else ''}")
     logger.info(f"   Stream: {request.stream}")
     logger.info(f"   Max Tokens: {request.max_tokens}")
     logger.info(f"   Temperature: {request.temperature}")
@@ -306,7 +301,8 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
             )
         else:
             logger.info("📞 Making non-streaming request to Ollama...")
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            timeout_value = int(os.getenv('TIMEOUT', 300))
+            async with httpx.AsyncClient(timeout=timeout_value) as client:
                 response = await client.post(
                     f"{OLLAMA_BASE_URL}/api/generate",
                     json=ollama_request
@@ -339,7 +335,8 @@ async def create_chat_completion(request: ChatCompletionRequest, raw_request: Re
 async def stream_chat_completion(ollama_request: Dict[str, Any], model: str, request_id: str) -> AsyncGenerator[str, None]:
     """Stream chat completion responses"""
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        timeout_value = int(os.getenv('TIMEOUT', 300))
+        async with httpx.AsyncClient(timeout=timeout_value) as client:
             async with client.stream(
                 "POST",
                 f"{OLLAMA_BASE_URL}/api/generate",
